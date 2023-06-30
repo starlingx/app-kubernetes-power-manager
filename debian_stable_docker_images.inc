@@ -1,0 +1,2 @@
+kubernetes-power-manager-images
+

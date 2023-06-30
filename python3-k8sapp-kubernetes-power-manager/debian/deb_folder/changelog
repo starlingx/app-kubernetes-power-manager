@@ -1,0 +1,5 @@
+python3-k8sapp-kubernetes-power-manager (1.0-0) unstable; urgency=medium
+
+  * Initial Release
+
+  -- Thiago Miranda <tmarques@windriver.com> Mon, 1 Aug 2022 08:00:00 +0000

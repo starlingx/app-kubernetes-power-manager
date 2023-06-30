@@ -1,0 +1,21 @@
+# Copyright (c) 2023 Wind River Systems, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: power.intel.com/v1
+kind: PowerConfig
+
+metadata:
+   name: power-config
+   namespace: intel-power
+
+spec:
+   powerNodeSelector:
+     power-management: enabled
+   powerProfiles:
+   - "performance"
+   - "balance-performance"
+   - "balance-power"
+   customDevices:
+   - "windriver.com/isolcpus"

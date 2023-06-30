@@ -1,0 +1,42 @@
+# Copyright (c) 2023 Wind River Systems, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+
+metadata:
+  name: kubernetes-power-manager
+  labels:
+    chart_group: kubernetes-power-manager-charts
+
+spec:
+  releaseName: kubernetes-power-manager
+  chart:
+    spec:
+      chart: kubernetes-power-manager
+      version: 2.3.0
+      sourceRef:
+        kind: HelmRepository
+        name: stx-platform
+
+  interval: 1m
+  timeout: 30m
+  
+  test:
+    enable: false
+
+  install:
+    disableHooks: false
+
+  upgrade:
+    disableHooks: false
+
+  valuesFrom:
+  - kind: Secret
+    name: kubernetes-power-manager-static-overrides
+    valuesKey: kubernetes-power-manager-static-overrides.yaml
+  - kind: Secret
+    name: kubernetes-power-manager-system-overrides
+    valuesKey: kubernetes-power-manager-system-overrides.yaml

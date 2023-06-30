@@ -1,0 +1,9 @@
+BUILDER=script
+LABEL=power-operator
+SOURCE_REPO=https://github.com/intel/kubernetes-power-manager.git
+SOURCE_REF=v2.3.0
+SOURCE_PATCHES="../files/0001-Enable-the-usage-of-Device-Plugins.patch ../files/0002-Corrects-cpu-accounting-and-container-deletion-from-workload.patch"
+COMMAND=bash
+SCRIPT=build.sh
+ARGS=power_operator
+

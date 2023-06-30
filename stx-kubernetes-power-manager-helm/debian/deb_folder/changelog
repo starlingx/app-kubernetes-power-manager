@@ -1,0 +1,5 @@
+stx-kubernetes-power-manager-helm (1.0-0) unstable; urgency=medium
+
+  * Initial Release.
+
+  -- Thiago Miranda <tmarques@windriver.com> Mon, 1 Aug 2023 08:00:00 +0000

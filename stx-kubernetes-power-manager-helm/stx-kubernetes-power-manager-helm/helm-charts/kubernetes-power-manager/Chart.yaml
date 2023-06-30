@@ -1,0 +1,11 @@
+# Copyright (c) 2023 Wind River Systems, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+apiVersion: v2
+description: A Helm chart for Kubernetes Power Manager
+name: kubernetes-power-manager
+type: application
+version: 2.3.0
+appVersion: 2.3.0

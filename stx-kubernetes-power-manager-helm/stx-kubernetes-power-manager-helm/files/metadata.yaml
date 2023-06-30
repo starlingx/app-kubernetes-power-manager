@@ -1,0 +1,23 @@
+# Copyright (c) 2023 Wind River Systems, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+app_name: @APP_NAME@
+app_version: @APP_VERSION@
+helm_repo: @HELM_REPO@
+
+maintain_user_overrides: true
+
+upgrades:
+  auto_update: true
+
+behavior:
+  platform_managed_app: yes
+  evaluate_reapply:
+    after:
+    - node-feature-discovery
+
+    triggers:
+    - type: host-label-assign
+    - type: host-modify

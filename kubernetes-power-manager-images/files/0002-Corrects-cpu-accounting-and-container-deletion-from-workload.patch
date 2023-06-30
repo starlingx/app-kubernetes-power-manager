@@ -1,0 +1,223 @@
+From 114bd1192e2538ddd9e2a7fe051ce6cdc6a97767 Mon Sep 17 00:00:00 2001
+From: Eduardo Alberti <eduardo.alberti@windriver.com>
+Date: Fri, 11 Aug 2023 14:18:51 +0000
+Subject: [PATCH] Corrects cpu accounting and container deletion from
+ workload
+
+CPU accounting should consider the total available CPUs, not
+only the ones allocated to the pod.
+Additionally while deleting pods from workload, we should
+match the precise Pod to avoid issues with same Pod Name
+in a different namespace.
+
+This modification uses the sytem CPU for accounting instead
+of runtime NumCPUs.
+
+This modification also handles the pod considering the Pod ID
+and not only pod name.
+
+Pull request
+https://github.com/intel/kubernetes-power-manager/pull/57
+https://github.com/intel/kubernetes-power-manager/pull/56
+
+Signed-off-by: Eduardo Alberti <eduardo.alberti@windriver.com>
+---
+ controllers/powerpod_controller.go     | 18 ++++++----
+ controllers/powerprofile_controller.go | 48 ++++++++++++++++++++++++--
+ pkg/podstate/podstate.go               | 20 +++++++++++
+ 3 files changed, 77 insertions(+), 9 deletions(-)
+
+diff --git a/controllers/powerpod_controller.go b/controllers/powerpod_controller.go
+index c348a42..6691006 100644
+--- a/controllers/powerpod_controller.go
++++ b/controllers/powerpod_controller.go
+@@ -92,10 +92,10 @@ func (r *PowerPodReconciler) Reconcile(c context.Context, req ctrl.Request) (ctr
+ 	if !pod.ObjectMeta.DeletionTimestamp.IsZero() || pod.Status.Phase == corev1.PodSucceeded {
+ 		// If the pod's deletion timestamp is not zero, then the pod has been deleted
+ 
+-		powerPodState := r.State.GetPodFromState(pod.GetName(), pod.GetNamespace())
++		powerPodState := r.State.GetPodFromStateUID(string(pod.GetUID()))
+ 
+-		logger.V(5).Info("removing the pod from the internal state")
+-		if err = r.State.DeletePodFromState(pod.GetName(), pod.GetNamespace()); err != nil {
++		logger.V(5).Info("Removing Pod from internal state", "Pod Name", pod.GetName(), "UID", pod.GetUID())
++		if err = r.State.DeletePodFromStateUID(string(pod.GetUID())); err != nil {
+ 			logger.Error(err, "error removing the pod from the internal state")
+ 			return ctrl.Result{}, err
+ 		}
+@@ -105,6 +105,7 @@ func (r *PowerPodReconciler) Reconcile(c context.Context, req ctrl.Request) (ctr
+ 		for _, container := range powerPodState.Containers {
+ 			workload := container.Workload
+ 			cpus := container.ExclusiveCPUs
++			logger.V(5).Info("Removing", "Workload", workload, "CPUs", cpus)
+ 			if _, exists := workloadToCPUsRemoved[workload]; exists {
+ 				workloadToCPUsRemoved[workload] = append(workloadToCPUsRemoved[workload], cpus...)
+ 			} else {
+@@ -112,7 +113,7 @@ func (r *PowerPodReconciler) Reconcile(c context.Context, req ctrl.Request) (ctr
+ 			}
+ 		}
+ 		for workloadName, cpus := range workloadToCPUsRemoved {
+-			logger.V(5).Info("retrieving the workload instance %s", workloadName)
++			logger.V(5).Info("retrieving the workload instance", "Workload Name", workloadName)
+ 			workload := &powerv1.PowerWorkload{}
+ 			err = r.Get(context.TODO(), client.ObjectKey{
+ 				Namespace: IntelPowerNamespace,
+@@ -224,6 +225,7 @@ func (r *PowerPodReconciler) Reconcile(c context.Context, req ctrl.Request) (ctr
+ 
+ 			workloadContainer := container
+ 			workloadContainer.Pod = pod.Name
++			workloadContainer.Workload = workloadName
+ 			containerList = append(containerList, workloadContainer)
+ 		}
+ 		for i, newContainer := range containerList {
+@@ -295,9 +297,11 @@ func (r *PowerPodReconciler) getPowerProfileRequestsFromContainers(containers []
+ 		containerID := getContainerID(pod, container.Name)
+ 		coreIDs, err := r.PodResourcesClient.GetContainerCPUs(pod.GetName(), container.Name)
+ 		if err != nil {
++			logger.V(5).Info("Error getting CoreIDs.", "ContainerID", containerID)
+ 			return map[string][]uint{}, []powerv1.Container{}, err
+ 		}
+ 		cleanCoreList := getCleanCoreList(coreIDs)
++		logger.V(5).Info("Reserving cores to container.", "ContainerID", containerID, "Cores", cleanCoreList)
+ 
+ 		logger.V(5).Info("creating the power container")
+ 		powerContainer := &powerv1.Container{}
+@@ -362,7 +366,7 @@ func getNewWorkloadContainerList(nodeContainers []powerv1.Container, podStateCon
+ 
+ 	logger.V(5).Info("checking if there are new containers for the workload")
+ 	for _, container := range nodeContainers {
+-		if !isContainerInList(container.Name, podStateContainers, logger) {
++		if !isContainerInList(container.Name, container.Id, podStateContainers, logger) {
+ 			newNodeContainers = append(newNodeContainers, container)
+ 		}
+ 	}
+@@ -371,9 +375,9 @@ func getNewWorkloadContainerList(nodeContainers []powerv1.Container, podStateCon
+ }
+ 
+ // Helper function - if container is in a list of containers
+-func isContainerInList(name string, containers []powerv1.Container, logger *logr.Logger) bool {
++func isContainerInList(name string, uid string, containers []powerv1.Container, logger *logr.Logger) bool {
+ 	for _, container := range containers {
+-		if container.Name == name {
++		if container.Name == name && container.Id == uid {
+ 			return true
+ 		}
+ 	}
+diff --git a/controllers/powerprofile_controller.go b/controllers/powerprofile_controller.go
+index c47591c..32afa9e 100644
+--- a/controllers/powerprofile_controller.go
++++ b/controllers/powerprofile_controller.go
+@@ -20,6 +20,7 @@ import (
+ 	"context"
+ 	"fmt"
+ 	"os"
++	"path"
+ 	rt "runtime"
+ 	"strconv"
+ 	"strings"
+@@ -41,6 +42,7 @@ import (
+ const (
+ 	MaxFrequencyFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+ 	MinFrequencyFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq"
++	basePath         = "/sys/devices/system/cpu"
+ )
+ 
+ // performance          ===>  priority level 0
+@@ -331,8 +333,8 @@ func (r *PowerProfileReconciler) createExtendedResources(nodeName string, profil
+ 		return err
+ 	}
+ 
+-	numCPUsOnNode := float64(rt.NumCPU())
+-	logger.V(5).Info("configuring based on the percentage associated to the specific power profile")
++	numCPUsOnNode := float64(getNumberOfCpus(logger))
++	logger.V(5).Info("Configuring based on the percentage associated to the specific power profile", "CPUS", numCPUsOnNode)
+ 	numExtendedResources := int64(numCPUsOnNode * profilePercentages[eppValue]["resource"])
+ 	profilesAvailable := resource.NewQuantity(numExtendedResources, resource.DecimalSI)
+ 	extendedResourceName := corev1.ResourceName(fmt.Sprintf("%s%s", ExtendedResourcePrefix, profileName))
+@@ -419,3 +421,45 @@ func checkGovs(profileGovernor string) bool {
+ 	}
+ 	return false
+ }
++
++func getNumberOfCpus(logger *logr.Logger) uint {
++	// First, try to get CPUs from sysfs. If the sysfs isn't available
++	// return Number of CPUs from runtime
++	cpusAvailable, err := readStringFromFile(path.Join(basePath, "online"))
++	if err != nil {
++		logger.V(3).Info("NUMCPU: Error during file reading", "Runtime CPUS", rt.NumCPU())
++		return uint(rt.NumCPU())
++	}
++
++	// Delete \n character and split the string to get
++	// first and last element
++	cpusAvailable = strings.Replace(cpusAvailable, "\n", "", -1)
++	cpuSlice := strings.Split(cpusAvailable, "-")
++	if len(cpuSlice) < 2 {
++		logger.V(3).Info("NUMCPU: Error during CPU slicing", "Runtime CPUS", rt.NumCPU())
++		return uint(rt.NumCPU())
++	}
++
++	// Calculate number of CPUs, if an error occurs
++	// return the number of CPUs from runtime
++	firstElement, err := strconv.Atoi(cpuSlice[0])
++	if err != nil {
++		logger.V(3).Info("NUMCPU: Error during first element convertion", "Runtime CPUS", rt.NumCPU())
++		return uint(rt.NumCPU())
++	}
++	secondElement, err := strconv.Atoi(cpuSlice[1])
++	if err != nil {
++		logger.V(3).Info("NUMCPU: Error during second element convertion", "Runtime CPUS", rt.NumCPU())
++		return uint(rt.NumCPU())
++	}
++	logger.V(3).Info("NUMCPU: success", "Online CPUS", uint((secondElement-firstElement)+1))
++	return uint((secondElement - firstElement) + 1)
++}
++
++func readStringFromFile(filePath string) (string, error) {
++	valueByte, err := os.ReadFile(filePath)
++	if err != nil {
++		return "", err
++	}
++	return string(valueByte), nil
++}
+diff --git a/pkg/podstate/podstate.go b/pkg/podstate/podstate.go
+index 2cbd093..0b66c22 100644
+--- a/pkg/podstate/podstate.go
++++ b/pkg/podstate/podstate.go
+@@ -38,6 +38,16 @@ func (s *State) GetPodFromState(podName string, podNamespace string) powerv1.Gua
+ 	return powerv1.GuaranteedPod{}
+ }
+ 
++func (s *State) GetPodFromStateUID(podUID string) powerv1.GuaranteedPod {
++	for _, existingPod := range s.GuaranteedPods {
++		if existingPod.UID == podUID {
++			return existingPod
++		}
++	}
++
++	return powerv1.GuaranteedPod{}
++}
++
+ func (s *State) GetCPUsFromPodState(podState powerv1.GuaranteedPod) []uint {
+ 	cpus := make([]uint, 0)
+ 	for _, container := range podState.Containers {
+@@ -47,6 +57,16 @@ func (s *State) GetCPUsFromPodState(podState powerv1.GuaranteedPod) []uint {
+ 	return cpus
+ }
+ 
++func (s *State) DeletePodFromStateUID(podUID string) error {
++	for i, pod := range s.GuaranteedPods {
++		if pod.UID == podUID {
++			s.GuaranteedPods = append(s.GuaranteedPods[:i], s.GuaranteedPods[i+1:]...)
++		}
++	}
++
++	return nil
++}
++
+ func (s *State) DeletePodFromState(podName string, podNamespace string) error {
+ 	for i, pod := range s.GuaranteedPods {
+ 		if pod.Name == podName && pod.Namespace == podNamespace {
+-- 
+2.34.1
+

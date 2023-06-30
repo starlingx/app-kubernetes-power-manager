@@ -1,0 +1,14 @@
+This directory contains all StarlingX charts that need to be built for this application.
+The Helm Charts are derived from Kubernetes yaml files for Kubernetes Power Manager.
+
+Additional information can be found at https://github.com/intel/kubernetes-power-manager.
+
+As the Kubernetes Power Manager versions are updated, maintainers of this repo will need to update
+the helm charts.
+
+======== Important note: StarlingX App Removal ==============
+During application installation, some custom resources are installed. Such features are removed
+during the application removal process. In case of failure during the application removal process,
+(rare occurrence) such as in cases of unavailability of some resource or failure of Kubernetes,
+it is necessary to assess, through sysinv.log, whether any of these resources remained installed.
+Removal can be performed manually by the user via the command line.

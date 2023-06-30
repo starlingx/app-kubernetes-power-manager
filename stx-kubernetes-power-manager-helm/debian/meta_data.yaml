@@ -1,0 +1,13 @@
+# Copyright (c) 2023 Wind River Systems, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+debname: stx-kubernetes-power-manager-helm
+debver: 1.0-0
+src_path: stx-kubernetes-power-manager-helm
+revision:
+  dist: $STX_DIST
+  GITREVCOUNT:
+    SRC_DIR: ${MY_REPO}/stx/app-kubernetes-power-manager
+    BASE_SRCREV: 789f333dec616b91ddb871cf21fdb07e6bf8d750

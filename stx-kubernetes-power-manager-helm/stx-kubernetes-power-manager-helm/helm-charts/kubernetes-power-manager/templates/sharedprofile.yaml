@@ -1,0 +1,26 @@
+{{- $top := . -}}
+{{- range $node, $powerprofile := .Values.sharedProfile }}
+---
+apiVersion: "power.intel.com/v1"
+kind: PowerProfile
+metadata:
+  name: shared-{{ $node }}
+  namespace: intel-power
+spec:
+  name: shared-{{ $node }}
+{{- if $powerprofile.shared }}
+  shared: {{ $powerprofile.shared }}
+{{- end -}}
+{{- if $powerprofile.epp }}
+  epp: {{ $powerprofile.epp }}
+{{- end -}}
+{{- if $powerprofile.max }}
+  max: {{ $powerprofile.max }}
+{{- end -}}
+{{- if $powerprofile.min }}
+  min: {{ $powerprofile.min }}
+{{- end -}}
+{{- if $powerprofile.governor }}
+  governor: {{ $powerprofile.governor }}
+{{- end -}}
+{{- end -}}

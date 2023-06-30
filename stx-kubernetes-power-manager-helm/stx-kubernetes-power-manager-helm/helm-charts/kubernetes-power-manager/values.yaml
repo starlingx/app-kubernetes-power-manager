@@ -1,0 +1,26 @@
+# Copyright (c) 2023 Wind River Systems, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Default values for kubernetes-power-manager.
+
+---
+manager:
+  image:
+    repository: docker.io/starlingx/power-operator
+    tag: stx.9.0-v2.3.0
+agent:
+  image:
+    repository: docker.io/starlingx/power-node-agent
+    tag: stx.9.0-v2.3.0
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node-role.kubernetes.io/master"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+imagePullSecrets:
+  - name: default-registry-key
