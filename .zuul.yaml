@@ -7,6 +7,7 @@
         - k8sapp-kubernetes-power-manager-tox-flake8
         - k8sapp-kubernetes-power-manager-tox-pylint
         - k8sapp-kubernetes-power-manager-tox-bandit
+        - k8sapp-kubernetes-power-manager-tox-metadata
     gate:
       jobs:
         - openstack-tox-linters
@@ -14,6 +15,7 @@
         - k8sapp-kubernetes-power-manager-tox-flake8
         - k8sapp-kubernetes-power-manager-tox-pylint
         - k8sapp-kubernetes-power-manager-tox-bandit
+        - k8sapp-kubernetes-power-manager-tox-metadata
     post:
       jobs:
         - stx-app-kubernetes-power-manager-upload-git-mirror
@@ -48,6 +50,25 @@
     vars:
         tox_envlist: flake8
         tox_extra_args: -c python3-k8sapp-kubernetes-power-manager/k8sapp_kubernetes_power_manager/tox.ini
+
+- job:
+    name: k8sapp-kubernetes-power-manager-tox-metadata
+    parent: tox
+    description: |
+        Run metadata test for kubernetes-power-manager
+    nodeset: debian-bullseye
+    required-projects:
+      - starlingx/config
+      - starlingx/fault
+      - starlingx/update
+      - starlingx/utilities
+      - starlingx/root
+    files:
+      - python3-k8sapp-kubernetes-power-manager/*
+    vars:
+        tox_envlist: metadata
+        tox_extra_args: -c python3-k8sapp-kubernetes-power-manager/k8sapp_kubernetes_power_manager/tox.ini
+        tox_constraints_file: '{{ ansible_user_dir }}/src/opendev.org/starlingx/root/build-tools/requirements/debian/upper-constraints.txt'
 
 - job:
     name: k8sapp-kubernetes-power-manager-tox-pylint
