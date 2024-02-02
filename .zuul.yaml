@@ -63,8 +63,6 @@
       - starlingx/update
       - starlingx/utilities
       - starlingx/root
-    files:
-      - python3-k8sapp-kubernetes-power-manager/*
     vars:
         tox_envlist: metadata
         tox_extra_args: -c python3-k8sapp-kubernetes-power-manager/k8sapp_kubernetes_power_manager/tox.ini
