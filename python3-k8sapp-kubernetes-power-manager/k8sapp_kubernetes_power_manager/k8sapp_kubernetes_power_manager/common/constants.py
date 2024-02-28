@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2023 Wind River Systems, Inc.
+# Copyright (c) 2023-2024 Wind River Systems, Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -45,3 +45,5 @@ HELM_CHART_NFD = 'node-feature-discovery'
 APPLICATION_CSTATE = "C1"
 CSTATE_C0 = "POLL"
 PLATFORM_CSTATE = "C6"
+
+PATCH_FILE = "/tmp/workloadPatch.yaml"

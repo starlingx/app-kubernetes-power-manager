@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+# export DH_VERBOSE = 1
+
+export ROOT = debian/tmp
+export APP_FOLDER = $(ROOT)/usr/lib/helm
+
+export DEB_VERSION = $(shell dpkg-parsechangelog | egrep '^Version:' | cut -f 2 -d ' ')
+export PATCH_VERSION = $(shell echo $(DEB_VERSION) | cut -f 4 -d '.')
+
+export BASE_CHART_VERSION=v2.4.0
+export BASE_HELM_VERSION=2.4.0
+export CHART_VERSION = $(BASE_CHART_VERSION)+STX.$(PATCH_VERSION)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Building CRDs, dependencies and removing source package.
+	mkdir -p helm/kubernetes-power-manager/crds
+	helm template crds helm/crds/ > helm/kubernetes-power-manager/crds/crds.yaml
+	helm dependency update helm/kubernetes-power-manager
+	rm -rf helm/crds/
+
+	# Copying and building power manager package
+	mkdir -p kubernetes-power-manager-compiled/kubernetes-power-manager
+	cp Makefile kubernetes-power-manager-compiled
+	cp -r helm/ kubernetes-power-manager-compiled/kubernetes-power-manager
+
+	cd kubernetes-power-manager-compiled && make CHART_VERSION=$(CHART_VERSION) kubernetes-power-manager
+
+override_dh_auto_install:
+	# Install the app tar file.
+	install -d -m 755 $(APP_FOLDER)
+	install -p -D -m 755 kubernetes-power-manager-compiled/kubernetes-power-manager*.tgz $(APP_FOLDER)
+
+override_dh_auto_test:
+
+override_dh_usrlocal:

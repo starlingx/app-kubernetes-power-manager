@@ -1,0 +1,18 @@
+# Copyright (c) 2024 Wind River Systems, Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+debname: kubernetes-power-manager-helm
+debver: 2.4-0
+dl_path:
+  name: kubernetes-power-manager-c057acdaa066ab338d7af66135dd1be4ce308e72.tar.gz
+  url: https://github.com/intel/kubernetes-power-manager/archive/c057acd.tar.gz
+  md5sum: e766da0da79e7df28eb6648423cc4493
+src_files:
+  - kubernetes-power-manager-helm/files/Makefile
+revision:
+  dist: $STX_DIST
+  GITREVCOUNT:
+    SRC_DIR: ${MY_REPO}/stx/app-kubernetes-power-manager/helm-charts/upstream/kubernetes-power-manager-helm
+    BASE_SRCREV: 789f333dec616b91ddb871cf21fdb07e6bf8d750

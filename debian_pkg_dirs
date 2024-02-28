@@ -1,2 +1,3 @@
+helm-charts/upstream/kubernetes-power-manager-helm
 python3-k8sapp-kubernetes-power-manager
 stx-kubernetes-power-manager-helm

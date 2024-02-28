@@ -1,3 +1,9 @@
+python3-k8sapp-kubernetes-power-manager (1.1-0) unstable; urgency=medium
+
+  * Initial Release
+
+  -- Eduardo Alberti <eduardo.alberti@windriver.com> Mon, 1 Aug 2022 08:00:00 +0000
+
 python3-k8sapp-kubernetes-power-manager (1.0-0) unstable; urgency=medium
 
   * Initial Release

@@ -1,0 +1,376 @@
+From e41e68afff0cb0fb5406054a28843f9977b3c691 Mon Sep 17 00:00:00 2001
+From: Guilherme Santos <guilherme.santos@windriver.com>
+Date: Mon, 4 Mar 2024 15:55:10 -0300
+Subject: [PATCH] Add STX Power Profile Node Customization
+
+This patch adds resources to allow power profile customization to each
+node. It also adapts the templates for `helm lint` to pass in the
+current helm version.
+
+Author: Guilherme Santos <guilherme.santos@windriver.com>
+Co-author: Eduardo Alberti <eduardo.alberti@windriver.com>
+
+Signed-off-by: Guilherme Santos <guilherme.santos@windriver.com>
+---
+ .../templates/template.yaml                   | 36 +++++----
+ helm/kubernetes-power-manager/values.yaml     | 24 +++++-
+ .../templates/_cstate.tpl                     | 13 ++++
+ .../templates/_deployment.tpl                 | 33 ++++++++-
+ .../templates/_new-shared-power-profile.tpl   | 32 +++++---
+ .../templates/_power-config.tpl               |  5 +-
+ .../_power-node-agent-ds-override.tpl         | 73 +++++++++++++++++++
+ .../templates/_power-workload.tpl             | 20 +++++
+ 8 files changed, 204 insertions(+), 32 deletions(-)
+ create mode 100644 helm/manager-chart-library/templates/_cstate.tpl
+ create mode 100644 helm/manager-chart-library/templates/_power-node-agent-ds-override.tpl
+ create mode 100644 helm/manager-chart-library/templates/_power-workload.tpl
+
+diff --git a/helm/kubernetes-power-manager/templates/template.yaml b/helm/kubernetes-power-manager/templates/template.yaml
+index bb78de4..2b3c980 100644
+--- a/helm/kubernetes-power-manager/templates/template.yaml
++++ b/helm/kubernetes-power-manager/templates/template.yaml
+@@ -1,28 +1,32 @@
+-{{- include "manager-chart-library.namespace" . }}
++{{ include "manager-chart-library.operatorserviceaccount" . }}
+ ---
+-{{- include "manager-chart-library.operatorserviceaccount" . }}
++{{ include "manager-chart-library.agentserviceaccount" . }}
+ ---
+-{{- include "manager-chart-library.agentserviceaccount" . }}
++{{ include "manager-chart-library.operatorrole" . }}
+ ---
+-{{- include "manager-chart-library.operatorrole" . }}
++{{ include "manager-chart-library.operatorrolebinding" . }}
+ ---
+-{{- include "manager-chart-library.operatorrolebinding" . }}
++{{ include "manager-chart-library.operatorclusterrole" . }}
+ ---
+-{{- include "manager-chart-library.operatorclusterrole" . }}
++{{ include "manager-chart-library.operatorclusterrolebinding" . }}
+ ---
+-{{- include "manager-chart-library.operatorclusterrolebinding" . }}
++{{ include "manager-chart-library.agentclusterrole" . }}
+ ---
+-{{- include "manager-chart-library.agentclusterrole" . }}
++{{ include "manager-chart-library.agentclusterrolebinding" . }}
+ ---
+-{{- include "manager-chart-library.agentclusterrolebinding" . }}
++{{ include "manager-chart-library.deployment" . }}
+ ---
+-{{- include "manager-chart-library.deployment" . }}
++{{ include "manager-chart-library.powerconfig" . }}
+ ---
+-{{- include "manager-chart-library.powerconfig" . }}
++{{ include "manager-chart-library.power-node-agent-ds-override" . }}
+ ---
+-{{- if  eq (semver "2.2.0" | (semver .Chart.Version).Compare) 1}}
+-{{- include "manager-chart-library.new-shared-profile" . }}
+-{{- else }}
+-{{- include "manager-chart-library.shared-profile" . }}
+-{{- end }}
++{{ include "manager-chart-library.cstate" . }}
++---
++{{ include "manager-chart-library.power-workload" . }}
++---
++{{ if  eq (semver "2.2.0" | (semver .Chart.Version).Compare) 1}}
++{{ include "manager-chart-library.new-shared-profile" . }}
++{{ else }}
++{{ include "manager-chart-library.shared-profile" . }}
++{{ end }}
+ # above checks the version to decide which template to use
+\ No newline at end of file
+diff --git a/helm/kubernetes-power-manager/values.yaml b/helm/kubernetes-power-manager/values.yaml
+index 4dd2d63..61dd135 100644
+--- a/helm/kubernetes-power-manager/values.yaml
++++ b/helm/kubernetes-power-manager/values.yaml
+@@ -69,11 +69,11 @@ operator:
+       name: intel-power-operator
+     command: /manager
+     args: --enable-leader-election
+-    image: intel/power-operator:v2.4.0
++    image: docker.io/intel/power-operator:v2.4.0
+     name: manager
+     cpu:
+       limits: 100m
+-      requests: 100m
++      requests: 0
+     memory:
+       limits: 30Mi
+       requests: 30Mi
+@@ -83,8 +83,8 @@ powerconfig:
+   name: power-config
+   namespace: intel-power
+   nodeselector:
+-    label: "feature.node.kubernetes.io/power-node"
+-    value: 'true'
++    label: power-management
++    value: enabled
+ 
+ # Values for the Shared PowerProfile
+ sharedprofile:
+@@ -96,3 +96,19 @@ sharedprofile:
+     min: 1000
+     epp: "power"
+     governor: "powersave"
++
++
++# STX
++agent:
++  image:
++    repository: docker.io/intel/power-node-agent
++    tag: v2.4.0
++  tolerations:
++    - key: "node-role.kubernetes.io/control-plane"
++      operator: "Exists"
++      effect: "NoSchedule"
++    - key: "node-role.kubernetes.io/master"
++      operator: "Exists"
++      effect: "NoSchedule"
++imagePullSecrets:
++  - name: default-registry-key
+\ No newline at end of file
+diff --git a/helm/manager-chart-library/templates/_cstate.tpl b/helm/manager-chart-library/templates/_cstate.tpl
+new file mode 100644
+index 0000000..cbb5a9c
+--- /dev/null
++++ b/helm/manager-chart-library/templates/_cstate.tpl
+@@ -0,0 +1,13 @@
++{{- define "manager-chart-library.cstate" -}}
++{{- $top := . -}}
++{{- range $node, $cstates := .Values.cstatesProfile }}
++---
++apiVersion: power.intel.com/v1
++kind: CStates
++metadata:
++  name: {{ $node }}
++  namespace: intel-power
++spec:
++  {{- toYaml $cstates | nindent 2 }}
++{{- end -}}
++{{- end -}}
+\ No newline at end of file
+diff --git a/helm/manager-chart-library/templates/_deployment.tpl b/helm/manager-chart-library/templates/_deployment.tpl
+index cd7bed3..2adc6cb 100644
+--- a/helm/manager-chart-library/templates/_deployment.tpl
++++ b/helm/manager-chart-library/templates/_deployment.tpl
+@@ -25,7 +25,7 @@ spec:
+         imagePullPolicy: IfNotPresent
+         image: {{ .Values.operator.container.image }}
+         securityContext:
+-          allowPrivilegeEscalation: false
++          allowPrivilegeEscalation: true
+           capabilities:
+             drop: ["ALL"]
+         name: {{ .Values.operator.container.name }}
+@@ -41,10 +41,41 @@ spec:
+           name: cgroup
+           mountPropagation: HostToContainer
+           readOnly: true
++        - mountPath: /power-manifests/power-node-agent-ds.yaml
++          name: power-node-agent-ds
++          subPath: power-node-agent-ds.yaml
++          readOnly: true
++      affinity:
++        nodeAffinity:
++          preferredDuringSchedulingIgnoredDuringExecution:
++          - weight: 1
++            preference:
++              matchExpressions:
++              - key: "node-role.kubernetes.io/master"
++                operator: Exists
++          - weight: 1
++            preference:
++              matchExpressions:
++              - key: "node-role.kubernetes.io/control-plane"
++                operator: Exists
++{{- with .Values.imagePullSecrets }}
++      imagePullSecrets:
++{{ toYaml . | indent 6 }}
++{{- end }}
++      tolerations:
++      - key: node-role.kubernetes.io/master
++        operator: Exists
++        effect: NoSchedule
++      - key: node-role.kubernetes.io/control-plane
++        operator: Exists
++        effect: NoSchedule
+       terminationGracePeriodSeconds: 10
+       volumes:
+       - name: cgroup
+         hostPath:
+           path: /sys/fs
++      - name: power-node-agent-ds
++        configMap:
++          name: power-node-agent-ds
+ 
+ {{- end -}}
+\ No newline at end of file
+diff --git a/helm/manager-chart-library/templates/_new-shared-power-profile.tpl b/helm/manager-chart-library/templates/_new-shared-power-profile.tpl
+index 263a965..7e340a6 100644
+--- a/helm/manager-chart-library/templates/_new-shared-power-profile.tpl
++++ b/helm/manager-chart-library/templates/_new-shared-power-profile.tpl
+@@ -1,14 +1,28 @@
+ {{- define "manager-chart-library.new-shared-profile" -}}
++{{- $top := . -}}
++{{- range $node, $powerprofile := .Values.sharedProfile }}
++---
+ apiVersion: power.intel.com/v1
+ kind: PowerProfile
+ metadata:
+-  name: {{ .Values.sharedprofile.name }}
+-  namespace: {{ .Values.sharedprofile.namespace }}
++  name: shared-{{ $node }}
++  namespace: intel-power
+ spec:
+-  name: {{ .Values.sharedprofile.spec.name }}
+-  max: {{ .Values.sharedprofile.spec.max }}
+-  min: {{ .Values.sharedprofile.spec.min }}
+-  epp: {{ .Values.sharedprofile.spec.epp }}
+-  governor: {{ .Values.sharedprofile.spec.governor }}
+-  shared: true
+-{{- end -}}
+\ No newline at end of file
++  name: shared-{{ $node }}
++{{- if $powerprofile.shared }}
++  shared: {{ $powerprofile.shared }}
++{{- end -}}
++{{- if $powerprofile.epp }}
++  epp: {{ $powerprofile.epp }}
++{{- end -}}
++{{- if $powerprofile.max }}
++  max: {{ $powerprofile.max }}
++{{- end -}}
++{{- if $powerprofile.min }}
++  min: {{ $powerprofile.min }}
++{{- end -}}
++{{- if $powerprofile.governor }}
++  governor: {{ $powerprofile.governor }}
++{{- end -}}
++{{- end -}}
++{{- end -}}
+diff --git a/helm/manager-chart-library/templates/_power-config.tpl b/helm/manager-chart-library/templates/_power-config.tpl
+index 3a31593..508d874 100644
+--- a/helm/manager-chart-library/templates/_power-config.tpl
++++ b/helm/manager-chart-library/templates/_power-config.tpl
+@@ -6,10 +6,11 @@ metadata:
+   namespace: {{ .Values.powerconfig.namespace }}
+ spec:
+   powerNodeSelector:
+-    {{ .Values.powerconfig.nodeselector.label }}: "{{  .Values.powerconfig.nodeselector.value  }}"
++    "{{ .Values.powerconfig.nodeselector.label }}": "{{  .Values.powerconfig.nodeselector.value  }}"
+   powerProfiles:
+   - "performance"
+   - "balance-performance"
+   - "balance-power"
+-
++  customDevices:
++  - "windriver.com/isolcpus"
+ {{- end -}}
+diff --git a/helm/manager-chart-library/templates/_power-node-agent-ds-override.tpl b/helm/manager-chart-library/templates/_power-node-agent-ds-override.tpl
+new file mode 100644
+index 0000000..0090be8
+--- /dev/null
++++ b/helm/manager-chart-library/templates/_power-node-agent-ds-override.tpl
+@@ -0,0 +1,73 @@
++{{- define "manager-chart-library.power-node-agent-ds-override" -}}
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: power-node-agent-ds
++  namespace: intel-power
++data:
++  power-node-agent-ds.yaml: |
++    apiVersion: apps/v1
++    kind: DaemonSet
++    metadata:
++      name: power-node-agent
++      namespace: intel-power
++    spec:
++      selector:
++        matchLabels:
++          name: power-node-agent-pod
++      template:
++        metadata:
++          namespace: intel-power
++          labels:
++            name: power-node-agent-pod
++        spec:
++          serviceAccountName: intel-power-node-agent
++{{- with .Values.agent.tolerations }}
++          tolerations:
++{{ toYaml . | indent 12 }}
++{{- end }}
++{{- with .Values.imagePullSecrets }}
++          imagePullSecrets:
++{{ toYaml . | indent 12 }}
++{{- end }}
++          containers:
++            - image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}
++              imagePullPolicy: IfNotPresent
++              securityContext:
++                privileged: true
++                runAsUser: 0
++              name: power-node-agent
++              args: [ "--zap-log-level","3" ]
++              env:
++                - name: NODE_NAME
++                  valueFrom:
++                    fieldRef:
++                      fieldPath: spec.nodeName
++              resources:
++                limits:
++                  cpu: 100m
++                  memory: 64Mi
++                requests:
++                  cpu: 0
++                  memory: 64Mi
++              volumeMounts:
++                - mountPath: /sys/devices/system/cpu
++                  name: cpusetup
++                - mountPath: /sys/fs/cgroup
++                  name: cgroup
++                  readOnly: true
++                - mountPath: /var/lib/kubelet/pod-resources/
++                  name: kubesock
++                  readOnly: true
++          volumes:
++            - name: cpusetup
++              hostPath:
++                path: /sys/devices/system/cpu
++            - name: cgroup
++              hostPath:
++                path: /sys/fs/cgroup
++            - name: kubesock
++              hostPath:
++                path: /var/lib/kubelet/pod-resources
++
++{{- end -}}
+diff --git a/helm/manager-chart-library/templates/_power-workload.tpl b/helm/manager-chart-library/templates/_power-workload.tpl
+new file mode 100644
+index 0000000..91db65f
+--- /dev/null
++++ b/helm/manager-chart-library/templates/_power-workload.tpl
+@@ -0,0 +1,20 @@
++{{- define "manager-chart-library.power-workload" -}}
++{{- $top := . -}}
++{{- range $node, $powerworkload := .Values.sharedProfile }}
++---
++apiVersion: power.intel.com/v1
++kind: PowerWorkload
++metadata:
++  name: shared-{{ $node }}-workload
++  namespace: intel-power
++spec:
++  name: shared-{{ $node }}-workload
++  allCores: true
++  powerNodeSelector:
++    kubernetes.io/hostname: {{ $node }}
++  powerProfile: shared-{{ $node }}
++  reservedCPUs:
++    - cores: {{ $powerworkload.reservedCPUs }}
++      powerProfile: {{ $powerworkload.reservedProfile }}
++{{- end -}}
++{{- end -}}
+-- 
+2.34.1
+

@@ -1,11 +1,10 @@
 #
-# Copyright (c) 2023 Wind River Systems, Inc.
+# Copyright (c) 2023-2024 Wind River Systems, Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
 
 """ System inventory App lifecycle operator."""
-
 import yaml
 
 from k8sapp_kubernetes_power_manager.common import constants as app_constants
@@ -13,8 +12,6 @@ from k8sapp_kubernetes_power_manager.common import constants as app_constants
 from oslo_log import log as logging
 from sysinv.common import constants as cst
 from sysinv.common import exception
-from sysinv.common import kubernetes
-from sysinv.common import utils as cutils
 from sysinv.helm import lifecycle_base as base
 
 
@@ -51,6 +48,12 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
                 and hook_info.operation == cst.APP_REMOVE_OP
                 and hook_info.relative_timing == cst.APP_LIFECYCLE_TIMING_POST):
             return self._post_remove(app, app_op)
+
+        # Update Request
+        if (hook_info.lifecycle_type == cst.APP_LIFECYCLE_TYPE_SEMANTIC_CHECK
+                and hook_info.operation == cst.APP_UPDATE_OP
+                and hook_info.relative_timing == cst.APP_LIFECYCLE_TIMING_PRE):
+            return self._pre_update(hook_info, app, app_op)
 
         super(KubernetesPowerManagerAppLifecycleOperator,
               self).app_lifecycle_actions(
@@ -94,6 +97,7 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
         LOG.debug(f"Executing post_remove for {app.name} app")
 
         k8s_client_core = app_op._kube._get_kubernetesclient_core()
+        k8s_client_ext = app_op._kube._get_kubernetesclient_extensions()
 
         # Remove all daemonsets (agents) started by the controller and any
         # orphan pods in namespace
@@ -101,16 +105,12 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
 
         # Helm doesn't remove CRDs. To clean up after application-remove,
         # we need to explicitly delete the CRDs
-        for crd in app_constants.HELM_APP_KUBERNETES_POWER_MANAGER_CRDS:
-            cmd = ['kubectl', '--kubeconfig', kubernetes.KUBERNETES_ADMIN_CONF,
-                   'delete', 'crd', crd]
-            stdout, stderr = cutils.trycmd(*cmd)
-            message = (f"{app.name} app: cmd={cmd} stdout={stdout} "
-                       f"stderr={stderr}")
-            if stderr != '':
-                raise ValueError(f"An error occur during the CRDs removal."
-                                 f"{message}")
-            LOG.debug(message)
+        try:
+            for crd in app_constants.HELM_APP_KUBERNETES_POWER_MANAGER_CRDS:
+                k8s_client_ext.delete_custom_resource_definition(name=crd)
+        except Exception as ex:
+            LOG.error(f"An error occur during the CRDs removal."
+                      f"{ex}")
 
         # Remove the namespace
         app_op._kube.kube_delete_namespace(
@@ -238,3 +238,36 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
         except Exception:
             LOG.error("Failed to delete pods in namespace %s",
                       app_constants.HELM_NS_KUBERNETES_POWER_MANAGER)
+
+    def _pre_update(self, hook_info, app, app_op):
+        """Patch the Power Workload CRD to enable the update
+
+        :param hook_info: LifecycleHookInfo object
+        :param app: AppOperator.Application object
+        :param app_op: AppOperator object
+        """
+
+        if app.status == cst.APP_APPLY_SUCCESS:
+            return
+
+        LOG.debug(f"Running app update to {app.version} version")
+        try:
+            file = open(app_constants.PATCH_FILE, "r")
+            body = yaml.safe_load(file.read())
+
+            k8s_client_ext = app_op._kube._get_kubernetesclient_extensions()
+            k8s_client_ext.patch_custom_resource_definition(
+                name=(app_constants.
+                      HELM_APP_KUBERNETES_POWER_MANAGER_CRD_POWERWORKLOADS),
+                body=body,
+            )
+        except yaml.YAMLError:
+            LOG.error(f"An error occurred during {app_constants.PATCH_FILE} "
+                      "yaml reading.")
+        except FileNotFoundError:
+            LOG.error(f"The existence of {app_constants.PATCH_FILE} "
+                      "was expected")
+        except Exception as ex:
+            LOG.error("Failed to path PowerWorkload resource "
+                      "during app update."
+                      f"{ex}")

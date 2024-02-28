@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2023 Wind River Systems, Inc.
+# Copyright (c) 2023-2024 Wind River Systems, Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -84,14 +84,19 @@ class KubernetesPowerManagerHelm(base.FluxCDBaseHelm):
         """
         override = {}
         for ihost in ihosts:
+            if (ihost.min_cpu_mhz_allowed is None or
+                    ihost.max_cpu_mhz_allowed is None):
+                continue
+
             override[ihost.hostname] = {
                 'min': int(ihost.min_cpu_mhz_allowed),
                 'max': int(ihost.max_cpu_mhz_allowed),
-                'reservedCPUs': self._get_platform_cpus_from_host(
-                    ihost.uuid
+                "reservedCPUs": '{}'.format(
+                    self._get_platform_cpus_from_host(ihost.uuid)
                 ),
                 'governor': 'performance',
                 'shared': True,
+                'reservedProfile': 'performance'
             }
         return override
 

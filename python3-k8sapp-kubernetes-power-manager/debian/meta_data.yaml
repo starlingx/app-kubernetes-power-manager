@@ -1,6 +1,6 @@
 ---
 debname: python3-k8sapp-kubernetes-power-manager
-debver: 1.0-0
+debver: 1.1-0
 src_path: k8sapp_kubernetes_power_manager
 revision:
   dist: $STX_DIST

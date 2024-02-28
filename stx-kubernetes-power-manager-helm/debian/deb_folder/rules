@@ -19,22 +19,37 @@ export STAGING = staging
 
 override_dh_auto_build:
 	# Setup the staging directory.
-	cd helm-charts && make
 	mkdir -p $(STAGING)
 	cp files/metadata.yaml $(STAGING)
 	cp -R fluxcd-manifests $(STAGING)
 	mkdir -p $(STAGING)/charts
-	cp helm-charts/*.tgz $(STAGING)/charts
+	cp /usr/lib/helm/kubernetes-power-manager-*.tgz $(STAGING)/charts
+
+	# Adjust the helmrelease yamls based on the chart versions
+	for c in $(STAGING)/charts/*; do \
+		chart=$$(basename $$c .tgz); \
+		chart_name=$${chart%-*}; \
+		chart_version=$${chart##*-}; \
+		echo "Found $$chart; name: $$chart_name, version: $$chart_version"; \
+		chart_manifest=$$(find $(STAGING)/fluxcd-manifests -name helmrelease.yaml -exec grep -q $$chart_name {} \; -print); \
+		echo "Updating manifest: $$chart_manifest"; \
+		sed -i "s/REPLACE_HELM_CHART_VERSION/$$chart_version/g" $$chart_manifest; \
+		grep version $$chart_manifest; \
+	done
+
 	# Populate metadata
 	sed -i 's/APP_REPLACE_NAME/$(APP_NAME)/g' $(STAGING)/metadata.yaml
 	sed -i 's/APP_REPLACE_VERSION/$(APP_VERSION)/g' $(STAGING)/metadata.yaml
 	sed -i 's/HELM_REPLACE_REPO/$(HELM_REPO)/g' $(STAGING)/metadata.yaml
+
 	# Copy the plugins: installed in the buildroot
 	mkdir -p $(STAGING)/plugins
 	cp /plugins/*.whl $(STAGING)/plugins
+
 	# Create the app package.
 	cd $(STAGING) && find . -type f ! -name '*.md5' -print0 | xargs -0 md5sum > checksum.md5
 	tar cfz $(APP_TARBALL) -C $(STAGING)/ .
+
 	# Cleanup staging
 	rm -rf $(STAGING)
 
@@ -42,6 +57,7 @@ override_dh_auto_install:
 	# Install the app tar file.
 	install -d -m 755 $(APP_FOLDER)
 	install -p -D -m 755 $(APP_TARBALL) $(APP_FOLDER)
+	install -p -D -m 755 files/workloadPatch.yaml $(ROOT)/tmp/workloadPatch.yaml
 
 override_dh_auto_test:
 

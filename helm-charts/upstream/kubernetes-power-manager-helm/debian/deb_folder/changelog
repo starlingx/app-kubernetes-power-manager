@@ -1,0 +1,5 @@
+kubernetes-power-manager-helm (2.4-0) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Guilherme Santos <guilherme.santos@windriver.com>  Mon, 4 Mar 2024 15:55:10 -0300
