@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ---
-debname: stx-kubernetes-power-manager-helm
+debname: stx-kubernetes-power-manager
 debver: 1.1-0
-src_path: stx-kubernetes-power-manager-helm
+src_path: stx-kubernetes-power-manager
 revision:
   dist: $STX_DIST
   GITREVCOUNT:

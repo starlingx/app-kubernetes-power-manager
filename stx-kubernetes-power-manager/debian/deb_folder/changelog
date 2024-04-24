@@ -1,0 +1,11 @@
+stx-kubernetes-power-manager (1.1-0) unstable; urgency=medium
+
+  * Renaming package according to the new app structure.
+
+  -- Guilherme Santos <guilherme.santos@windriver.com>  Mon, 24 Apr 2024 15:42:10 +0000
+
+stx-kubernetes-power-manager-helm (1.0-0) unstable; urgency=medium
+
+  * Initial Release.
+
+  -- Thiago Miranda <tmarques@windriver.com> Mon, 1 Aug 2023 08:00:00 +0000
