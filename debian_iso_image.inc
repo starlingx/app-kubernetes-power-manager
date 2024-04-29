@@ -1,1 +1,1 @@
-stx-kubernetes-power-manager-helm
+stx-kubernetes-power-manager
