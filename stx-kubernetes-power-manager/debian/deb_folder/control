@@ -11,6 +11,8 @@ Standards-Version: 4.5.1
 Homepage: https://www.starlingx.io
 
 Package: stx-kubernetes-power-manager
+Replaces: stx-kubernetes-power-manager-helm
+Conflicts: stx-kubernetes-power-manager-helm
 Section: libs
 Architecture: any
 Depends: ${misc:Depends}
