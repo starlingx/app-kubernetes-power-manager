@@ -96,7 +96,9 @@ class KubernetesPowerManagerHelm(base.FluxCDBaseHelm):
                 ),
                 'governor': 'performance',
                 'shared': True,
-                'reservedProfile': 'performance'
+                'reservedProfile': 'shared-{}'.format(
+                    ihost.hostname
+                )
             }
         return override
 
