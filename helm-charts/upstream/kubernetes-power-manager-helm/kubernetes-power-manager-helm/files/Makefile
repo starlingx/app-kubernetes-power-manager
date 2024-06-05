@@ -32,7 +32,7 @@ lint-%: init-%
 
 build-%: lint-%
 	if [ -d $* ]; then \
-		helm package $(HELM_DIR) --version $(CHART_BASE_VERSION) --app-version $(CHART_APP_VERSION); \
+		helm package $(HELM_DIR) --version $(CHART_VERSION) --app-version $(CHART_APP_VERSION); \
 	fi
 
 clean:

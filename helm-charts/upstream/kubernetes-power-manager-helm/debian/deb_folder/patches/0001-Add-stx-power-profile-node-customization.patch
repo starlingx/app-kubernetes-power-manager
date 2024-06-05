@@ -1,6 +1,6 @@
-From e41e68afff0cb0fb5406054a28843f9977b3c691 Mon Sep 17 00:00:00 2001
-From: Guilherme Santos <guilherme.santos@windriver.com>
-Date: Mon, 4 Mar 2024 15:55:10 -0300
+From 0899aef4abd265b67e947ef9fc133595c7eaa480 Mon Sep 17 00:00:00 2001
+From: Eduardo Alberti <eduardo.alberti@windriver.com>
+Date: Wed, 5 Jun 2024 08:13:10 -0300
 Subject: [PATCH] Add STX Power Profile Node Customization
 
 This patch adds resources to allow power profile customization to each
@@ -13,14 +13,14 @@ Co-author: Eduardo Alberti <eduardo.alberti@windriver.com>
 Signed-off-by: Guilherme Santos <guilherme.santos@windriver.com>
 ---
  .../templates/template.yaml                   | 36 +++++----
- helm/kubernetes-power-manager/values.yaml     | 24 +++++-
+ helm/kubernetes-power-manager/values.yaml     | 23 +++++-
  .../templates/_cstate.tpl                     | 13 ++++
  .../templates/_deployment.tpl                 | 33 ++++++++-
  .../templates/_new-shared-power-profile.tpl   | 32 +++++---
  .../templates/_power-config.tpl               |  5 +-
  .../_power-node-agent-ds-override.tpl         | 73 +++++++++++++++++++
  .../templates/_power-workload.tpl             | 20 +++++
- 8 files changed, 204 insertions(+), 32 deletions(-)
+ 8 files changed, 203 insertions(+), 32 deletions(-)
  create mode 100644 helm/manager-chart-library/templates/_cstate.tpl
  create mode 100644 helm/manager-chart-library/templates/_power-node-agent-ds-override.tpl
  create mode 100644 helm/manager-chart-library/templates/_power-workload.tpl
@@ -80,15 +80,15 @@ index bb78de4..2b3c980 100644
  # above checks the version to decide which template to use
 \ No newline at end of file
 diff --git a/helm/kubernetes-power-manager/values.yaml b/helm/kubernetes-power-manager/values.yaml
-index 4dd2d63..61dd135 100644
+index a93ac6e..feb340f 100644
 --- a/helm/kubernetes-power-manager/values.yaml
 +++ b/helm/kubernetes-power-manager/values.yaml
 @@ -69,11 +69,11 @@ operator:
        name: intel-power-operator
      command: /manager
      args: --enable-leader-election
--    image: intel/power-operator:v2.4.0
-+    image: docker.io/intel/power-operator:v2.4.0
+-    image: intel/power-operator:v2.5.0
++    image: docker.io/intel/power-operator:v2.5.0
      name: manager
      cpu:
        limits: 100m
@@ -108,17 +108,16 @@ index 4dd2d63..61dd135 100644
  
  # Values for the Shared PowerProfile
  sharedprofile:
-@@ -96,3 +96,19 @@ sharedprofile:
+@@ -96,3 +96,18 @@ sharedprofile:
      min: 1000
      epp: "power"
      governor: "powersave"
-+
 +
 +# STX
 +agent:
 +  image:
 +    repository: docker.io/intel/power-node-agent
-+    tag: v2.4.0
++    tag: v2.5.0
 +  tolerations:
 +    - key: "node-role.kubernetes.io/control-plane"
 +      operator: "Exists"
@@ -128,7 +127,6 @@ index 4dd2d63..61dd135 100644
 +      effect: "NoSchedule"
 +imagePullSecrets:
 +  - name: default-registry-key
-\ No newline at end of file
 diff --git a/helm/manager-chart-library/templates/_cstate.tpl b/helm/manager-chart-library/templates/_cstate.tpl
 new file mode 100644
 index 0000000..cbb5a9c

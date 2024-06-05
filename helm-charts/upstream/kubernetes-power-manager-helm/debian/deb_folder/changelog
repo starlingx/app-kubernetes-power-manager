@@ -1,3 +1,9 @@
+kubernetes-power-manager-helm (2.5-1) unstable; urgency=medium
+
+  * Kubernetes Power Manager upversion to v2.5.0.
+
+ -- Eduardo Alberti <eduardo.alberti@windriver.com>  Wed, 5 Jun 2024 12:00:00 -0300
+
 kubernetes-power-manager-helm (2.4-0) unstable; urgency=medium
 
   * Initial release.

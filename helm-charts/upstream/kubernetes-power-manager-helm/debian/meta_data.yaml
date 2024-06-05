@@ -4,15 +4,16 @@
 #
 ---
 debname: kubernetes-power-manager-helm
-debver: 2.4-0
+debver: 2.5-1
 dl_path:
-  name: kubernetes-power-manager-c057acdaa066ab338d7af66135dd1be4ce308e72.tar.gz
-  url: https://github.com/intel/kubernetes-power-manager/archive/c057acd.tar.gz
-  md5sum: e766da0da79e7df28eb6648423cc4493
+  name: kubernetes-power-manager-2.5.0.tar.gz
+  url: https://github.com/intel/kubernetes-power-manager/archive/v2.5.0.tar.gz
+  sha256sum: a3dc6b36eacc2c01e3ffec7af6a4ce71b5c00b753473ebb74a8e7f3c24ea0f79
 src_files:
   - kubernetes-power-manager-helm/files/Makefile
 revision:
   dist: $STX_DIST
+  stx_patch: 1
   GITREVCOUNT:
     SRC_DIR: ${MY_REPO}/stx/app-kubernetes-power-manager/helm-charts/upstream/kubernetes-power-manager-helm
     BASE_SRCREV: 789f333dec616b91ddb871cf21fdb07e6bf8d750
