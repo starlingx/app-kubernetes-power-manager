@@ -252,8 +252,7 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
 
         LOG.debug(f"Running app update to {app.version} version")
         try:
-            file = open(app_constants.PATCH_FILE, "r")
-            body = yaml.safe_load(file.read())
+            body = yaml.safe_load(app_constants.POWERWORKLOADS_PATCH)
 
             k8s_client_ext = app_op._kube._get_kubernetesclient_extensions()
             k8s_client_ext.patch_custom_resource_definition(
@@ -261,12 +260,6 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
                       HELM_APP_KUBERNETES_POWER_MANAGER_CRD_POWERWORKLOADS),
                 body=body,
             )
-        except yaml.YAMLError:
-            LOG.error(f"An error occurred during {app_constants.PATCH_FILE} "
-                      "yaml reading.")
-        except FileNotFoundError:
-            LOG.error(f"The existence of {app_constants.PATCH_FILE} "
-                      "was expected")
         except Exception as ex:
             LOG.error("Failed to path PowerWorkload resource "
                       "during app update."
