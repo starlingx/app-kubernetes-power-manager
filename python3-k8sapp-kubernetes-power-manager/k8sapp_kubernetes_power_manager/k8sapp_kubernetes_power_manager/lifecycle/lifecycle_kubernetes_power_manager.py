@@ -12,6 +12,8 @@ from k8sapp_kubernetes_power_manager.common import constants as app_constants
 from oslo_log import log as logging
 from sysinv.common import constants as cst
 from sysinv.common import exception
+from sysinv.common import kubernetes
+from sysinv.common import utils as cutils
 from sysinv.helm import lifecycle_base as base
 
 
@@ -96,12 +98,11 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
     def _post_remove(self, app, app_op):
         LOG.debug(f"Executing post_remove for {app.name} app")
 
-        k8s_client_core = app_op._kube._get_kubernetesclient_core()
         k8s_client_ext = app_op._kube._get_kubernetesclient_extensions()
 
         # Remove all daemonsets (agents) started by the controller and any
         # orphan pods in namespace
-        self._delete_pods(app_op, k8s_client_core)
+        self._delete_pods(app_op)
 
         # Helm doesn't remove CRDs. To clean up after application-remove,
         # we need to explicitly delete the CRDs
@@ -187,7 +188,7 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
             # Restarts all pods in namespace if label has changed
             if (previous_component_label is not None and
                     previous_component_label != component_label):
-                self._delete_pods(app_op, k8s_client_core)
+                self._delete_pods(app_op)
 
         else:
             raise ValueError(f"Value {component_label} for label:namespace"
@@ -215,14 +216,36 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
 
         return user_overrides
 
-    def _delete_pods(self, app_op, k8s_client_core):
+    def _delete_pods(self, app_op):
         """Delete all pods within the application namespace
 
         :param app_op: AppOperator object
         :param k8s_client_core: Kubernetes client object
         """
 
+        k8s_client_core = app_op._kube._get_kubernetesclient_core()
         try:
+            # Deleting Deployment
+            cmd = ['kubectl', '--kubeconfig', kubernetes.KUBERNETES_ADMIN_CONF,
+                   'delete', 'deployments', 'controller-manager',
+                   '-n', 'intel-power']
+            stdout, stderr = cutils.trycmd(*cmd)
+            message = (f"cmd={cmd} stdout={stdout} "
+                       f"stderr={stderr}")
+            if stderr != '':
+                LOG.error(f"An error occur during the PM deployment removal. "
+                          f"{message}")
+
+            # Deleting DaemonSet
+            cmd = ['kubectl', '--kubeconfig', kubernetes.KUBERNETES_ADMIN_CONF,
+                   'delete', 'ds', 'power-node-agent', '-n', 'intel-power']
+            stdout, stderr = cutils.trycmd(*cmd)
+            message = (f"cmd={cmd} stdout={stdout} "
+                       f"stderr={stderr}")
+            if stderr != '':
+                LOG.error(f"An error occur during the PM daemonset removal."
+                          f"{message}")
+
             # pod list
             pods = k8s_client_core.list_namespaced_pod(
                 app_constants.HELM_NS_KUBERNETES_POWER_MANAGER)
@@ -251,6 +274,10 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
             return
 
         LOG.debug(f"Running app update to {app.version} version")
+
+        # Delete pods
+        self._delete_pods(app_op)
+
         try:
             body = yaml.safe_load(app_constants.POWERWORKLOADS_PATCH)
 
