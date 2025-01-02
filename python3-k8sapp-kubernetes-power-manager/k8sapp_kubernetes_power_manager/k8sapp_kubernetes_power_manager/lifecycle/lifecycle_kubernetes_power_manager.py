@@ -15,6 +15,7 @@ from sysinv.common import exception
 from sysinv.common import kubernetes
 from sysinv.common import utils as cutils
 from sysinv.helm import lifecycle_base as base
+from sysinv.helm.lifecycle_constants import LifecycleConstants
 
 
 LOG = logging.getLogger(__name__)
@@ -34,27 +35,35 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
         """
 
         # Semantic Check
-        if (hook_info.lifecycle_type == cst.APP_LIFECYCLE_TYPE_SEMANTIC_CHECK
+        if (hook_info.lifecycle_type ==
+                LifecycleConstants.APP_LIFECYCLE_TYPE_SEMANTIC_CHECK
                 and hook_info.operation == cst.APP_APPLY_OP
-                and hook_info.relative_timing == cst.APP_LIFECYCLE_TIMING_PRE):
+                and hook_info.relative_timing ==
+                LifecycleConstants.APP_LIFECYCLE_TIMING_PRE):
             return self._pre_semantic_check(app, app_op)
 
         # FluxCD Request
-        if (hook_info.lifecycle_type == cst.APP_LIFECYCLE_TYPE_FLUXCD_REQUEST
+        if (hook_info.lifecycle_type ==
+                LifecycleConstants.APP_LIFECYCLE_TYPE_FLUXCD_REQUEST
                 and hook_info.operation == cst.APP_APPLY_OP
-                and hook_info.relative_timing == cst.APP_LIFECYCLE_TIMING_PRE):
+                and hook_info.relative_timing ==
+                LifecycleConstants.APP_LIFECYCLE_TIMING_PRE):
             return self._pre_fluxcd_request(app, app_op)
 
         # Operation
-        if (hook_info.lifecycle_type == cst.APP_LIFECYCLE_TYPE_OPERATION
+        if (hook_info.lifecycle_type ==
+                LifecycleConstants.APP_LIFECYCLE_TYPE_OPERATION
                 and hook_info.operation == cst.APP_REMOVE_OP
-                and hook_info.relative_timing == cst.APP_LIFECYCLE_TIMING_POST):
+                and hook_info.relative_timing ==
+                LifecycleConstants.APP_LIFECYCLE_TIMING_POST):
             return self._post_remove(app, app_op)
 
         # Update Request
-        if (hook_info.lifecycle_type == cst.APP_LIFECYCLE_TYPE_SEMANTIC_CHECK
+        if (hook_info.lifecycle_type ==
+                LifecycleConstants.APP_LIFECYCLE_TYPE_SEMANTIC_CHECK
                 and hook_info.operation == cst.APP_UPDATE_OP
-                and hook_info.relative_timing == cst.APP_LIFECYCLE_TIMING_PRE):
+                and hook_info.relative_timing ==
+                LifecycleConstants.APP_LIFECYCLE_TIMING_PRE):
             return self._pre_update(hook_info, app, app_op)
 
         super(KubernetesPowerManagerAppLifecycleOperator,
