@@ -18,9 +18,11 @@ supported_k8s_version:
 behavior:
   platform_managed_app: yes
   evaluate_reapply:
-    after:
-    - node-feature-discovery
-
     triggers:
     - type: host-label-assign
     - type: host-modify
+
+dependent_apps:
+  - name: node-feature-discovery
+    version: 25\.09-\d+
+    action: apply
