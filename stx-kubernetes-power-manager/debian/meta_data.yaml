@@ -4,7 +4,7 @@
 #
 ---
 debname: stx-kubernetes-power-manager
-debver: 1.1-2
+debver: 1.1-3
 src_path: stx-kubernetes-power-manager
 revision:
   dist: $STX_DIST
