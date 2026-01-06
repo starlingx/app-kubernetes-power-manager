@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Wind River Systems, Inc.
+# Copyright (c) 2024-2025 Wind River Systems, Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -18,9 +18,11 @@ supported_k8s_version:
 behavior:
   platform_managed_app: yes
   evaluate_reapply:
-    after:
-    - node-feature-discovery
-
     triggers:
     - type: host-label-assign
     - type: host-modify
+
+dependent_apps:
+  - name: node-feature-discovery
+    version: \d+\.\d+-\d+
+    action: warn

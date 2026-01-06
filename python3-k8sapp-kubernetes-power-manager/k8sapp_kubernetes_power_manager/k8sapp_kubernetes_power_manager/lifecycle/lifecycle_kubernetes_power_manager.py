@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2023-2024 Wind River Systems, Inc.
+# Copyright (c) 2023-2025 Wind River Systems, Inc.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -11,7 +11,6 @@ from k8sapp_kubernetes_power_manager.common import constants as app_constants
 
 from oslo_log import log as logging
 from sysinv.common import constants as cst
-from sysinv.common import exception
 from sysinv.common import kubernetes
 from sysinv.common import utils as cutils
 from sysinv.helm import lifecycle_base as base
@@ -33,14 +32,6 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
         :param hook_info: LifecycleHookInfo object
 
         """
-
-        # Semantic Check
-        if (hook_info.lifecycle_type ==
-                LifecycleConstants.APP_LIFECYCLE_TYPE_SEMANTIC_CHECK
-                and hook_info.operation == cst.APP_APPLY_OP
-                and hook_info.relative_timing ==
-                LifecycleConstants.APP_LIFECYCLE_TIMING_PRE):
-            return self._pre_semantic_check(app, app_op)
 
         # FluxCD Request
         if (hook_info.lifecycle_type ==
@@ -78,32 +69,6 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
         # to ensure that all pods in this namespace run on correct cores
         self._update_component_label(app, app_op)
 
-    def _pre_semantic_check(self, app, app_op):
-        LOG.debug(f"Executing pre_semantic_check for {app.name} app")
-
-        dbapi = app_op._dbapi
-        try:
-            nfd_kube_app = dbapi.kube_app_get(app_constants.HELM_APP_NFD)
-            LOG.info("Node Feature Discovery (NFD) Application found - "
-                     f"Version: {nfd_kube_app.app_version} - "
-                     "Status: {nfd_kube_app.status}")
-
-            nfd_installed = nfd_kube_app.status == cst.APP_APPLY_SUCCESS
-
-        except exception.KubeAppNotFound:
-            nfd_installed = False
-
-        if not nfd_installed:
-            if self._is_nfd_required(dbapi):
-                raise exception.LifecycleSemanticCheckException(
-                    "Node Feature Discovery (NFD) Application is required. "
-                    "You can bypass this check by setting the "
-                    f"{app_constants.HELM_NFD_REQUIRED_PARAM} parameter to "
-                    "False using overrides.")
-
-            LOG.info("Bypass flag for Node Feature Discovery (NFD) "
-                     "Application found.")
-
     def _post_remove(self, app, app_op):
         LOG.debug(f"Executing post_remove for {app.name} app")
 
@@ -125,42 +90,6 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
         # Remove the namespace
         app_op._kube.kube_delete_namespace(
             app_constants.HELM_NS_KUBERNETES_POWER_MANAGER)
-
-    def _is_nfd_required(self, dbapi):
-
-        """Checks the state of the parameter that controls whether the NFD
-        application is required
-
-        :param dbapi: dbapi
-        :return True if enabled otherwise False
-        """
-        val = True
-        try:
-            app = dbapi.kube_app_get(
-                app_constants.HELM_APP_KUBERNETES_POWER_MANAGER)
-
-            user_overrides = self._get_user_overrides(app, dbapi)
-            if app_constants.HELM_NFD_REQUIRED_PARAM in user_overrides:
-                if isinstance(
-                        user_overrides[app_constants.HELM_NFD_REQUIRED_PARAM],
-                        bool):
-                    val = user_overrides[app_constants.HELM_NFD_REQUIRED_PARAM]
-
-                LOG.error(f"The value of parameter "
-                          f"{app_constants.HELM_NFD_REQUIRED_PARAM} must be "
-                          "true or false.")
-
-        except exception.KubeAppNotFound as e:
-            LOG.error("Failed to access app info "
-                      f"{app_constants.HELM_APP_KUBERNETES_POWER_MANAGER}: "
-                      f"{e}")
-
-        except exception.HelmOverrideNotFound as e:
-            LOG.error("Failed to access user overrides from chart "
-                      f"{app_constants.HELM_CHART_KUBERNETES_POWER_MANAGER}: "
-                      f"{e}")
-
-        return val
 
     def _update_component_label(self, app, app_op):
         """Create the StarlingX component label in namespace

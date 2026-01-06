@@ -1,3 +1,15 @@
+stx-kubernetes-power-manager (1.1-3) unstable; urgency=medium
+
+  * Changing dependent app to warn action
+
+  -- Eduardo Alberti <eduardo.alberti@windriver.com>  Fri, 28 Nov 2025 12:00:00 +0000
+
+stx-kubernetes-power-manager (1.1-2) unstable; urgency=medium
+
+  * Fixes NFD version dependency control
+
+  -- Reynaldo Patrone Gomes <reynaldo.patronegomes@windriver.com>  Fri, 6 Nov 2025 10:10:00 +0000
+
 stx-kubernetes-power-manager (1.1-1) unstable; urgency=medium
 
   * File location changes
