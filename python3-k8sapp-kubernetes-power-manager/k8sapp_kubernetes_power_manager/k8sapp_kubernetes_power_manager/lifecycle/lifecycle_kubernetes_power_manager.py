@@ -57,6 +57,16 @@ class KubernetesPowerManagerAppLifecycleOperator(base.AppLifecycleOperator):
                 LifecycleConstants.APP_LIFECYCLE_TIMING_PRE):
             return self._pre_update(hook_info, app, app_op)
 
+        # Semantic check to allow automatic reapply
+        # This ensures that automatic reapply can proceed and prevents
+        # unnecessary alarm
+        if (hook_info.lifecycle_type ==
+                LifecycleConstants.APP_LIFECYCLE_TYPE_SEMANTIC_CHECK
+                and hook_info.relative_timing ==
+                LifecycleConstants.APP_LIFECYCLE_TIMING_PRE
+                and hook_info.operation == cst.APP_APPLY_OP):
+            return
+
         super(KubernetesPowerManagerAppLifecycleOperator,
               self).app_lifecycle_actions(
             context, conductor_obj, app_op, app, hook_info
